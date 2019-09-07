@@ -16,7 +16,9 @@ def main():
     while True:
         button, values = window.Read()
 
+        print('--------Event Start--------------')
         print(button, values, type(button), values['path'])
+        print('--------Event End --------------')
 
         if button == 'submit_file':
             try:
@@ -86,44 +88,78 @@ def main():
             chainage_index = row_list.index(values['chainage_box'][0])
             point_index = row_list.index(values['row_box'][0])
 
-            selection = df.iloc[:, [chainage_index, point_index]]
-            # Patten for numbers only
+            # pattern for number only
             pattern = "[^0-9.]"
 
-            # Drop row with no Elevation
-            selection.dropna(inplace=True)
+            for i in range(df.shape[0]):
 
+                df.iat[i, chainage_index] = str(df.iat[i, chainage_index])
+                df.iat[i, chainage_index] = df.iat[i, chainage_index].strip()
+
+                if window.find_element('comma'):
+                    df.iat[i, chainage_index].replace(',', '.')
+
+                try:
+                    float(df.iat[i, chainage_index])
+
+                except ValueError:
+                    # Remove anything in front of the chainaige number
+                    for x in range(len(df.iat[i, chainage_index])):
+
+                        if not re.search(pattern, df.iat[i, chainage_index][x:]):
+                            df.iat[i, chainage_index] = df.iat[i, chainage_index][x:]
+                            break
+
+            for i in range(df.shape[0]):
+
+                df.iat[i, point_index] = str(df.iat[i, point_index])
+                df.iat[i, point_index] = df.iat[i, point_index].strip()
+
+                if window.find_element('comma'):
+                    df.iat[i, point_index].replace(',', '.')
+
+                try:
+                    float(df.iat[i, point_index])
+
+
+                except ValueError:
+                    # Remove anything in front of the point number
+                    for x in range(len(df.iat[i, point_index])):
+
+                        if not re.search(pattern, df.iat[i, point_index][x:]):
+                            df.iat[i, point_index] = df.iat[i, point_index][x:]
+                            break
+
+            # Select 2 column and Drop row with no Elevation
+            selection = df.iloc[:, [chainage_index, point_index]]
+
+            to_drop = []
             for i in range(selection.shape[0]):
-                for j in range(selection.shape[1]):
-                    selection.iat[i, j] = str(selection.iat[i, j])
-                    selection.iat[i, j] = selection.iat[i, j].strip()
+                if selection.iat[i, -1] == 'nan' or selection.iat[i, 0] == 'nan':
+                    to_drop.append(i)
 
-                    if window.find_element('comma'):
-                        selection.iat[i, j].replace(',', '.')
-
-                    try:
-                        float(selection.iat[i, j])
-
-                    except ValueError:
-                        # Remove anything in front of the chainaige number
-                        for x in range(len(selection.iat[i, j])):
-
-                            if not re.search(pattern, selection.iat[i, j][x:]):
-                                selection.iat[i, j] = selection.iat[i, j][x:]
-                                break
+            selection.drop(selection.index[to_drop], inplace=True)
 
             #Crée une 2e list en ordre pour comparaison
             sort_selection = selection.sort_values(selection.columns[0])
             clean = True
             for i in range(selection.shape[0]):
-
                 if selection.iat[i, 0] == sort_selection.iat[i, 0]:
                     pass
                 else:
                     # Message d'erreur avec l'idendtification du probleme
-                    text = 'Ordre de Chainage non valide; verifier fichier excel; ligne: ' + \
-                           str(i + row_index + 1) + '; Donnee:' + selection.iat[i, 0]
+                    index_chainage_error = []
+                    for x in range(df.shape[0]):
+                        if df.iat[x, chainage_index] == selection.iat[i, 0] or df.iat[x, chainage_index] == sort_selection.iat[i, 0]:
+                            index_chainage_error.append((x, df.iat[x, chainage_index]))
+
+                    text = ""
+                    for x in index_chainage_error:
+                        text = text + 'Ordre de Chainage non valide; verifier fichier excel; ligne: ' +\
+                               str(x[0] + row_index + 2) + '; Chainage:' + x[1]+ '\n'
+
                     sg.PopupError(text)
+
                     clean = False
                     button = 'reset'
                     break
